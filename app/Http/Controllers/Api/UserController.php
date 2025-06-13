@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use App\Http\Resources\UserResource;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class UserController extends Controller
 {
@@ -63,5 +64,31 @@ class UserController extends Controller
     {
         $user->delete();
         return response()->noContent();
+    }
+
+    public function verify(Request $request)
+    {
+        $tokenEnviado = $request->bearerToken();
+        if (!$tokenEnviado || !str_contains($tokenEnviado, '|')) {
+            return response()->json(['message' => 'Token no proporcionado o formato inválido.'], 401);
+        }
+
+        [$tokenId, $tokenString] = explode('|', $tokenEnviado, 2);
+
+        $token = PersonalAccessToken::find($tokenId);
+
+        if (!$token) {
+            return response()->json(['message' => 'Token no encontrado.'], 401);
+        }
+        if (!hash_equals($token->token, hash('sha256', $tokenString))) {
+            return response()->json(['message' => 'Token inválido.'], 401);
+        }
+        if (isset($token->expires_date) && $token->expires_date < now()) {
+            return response()->json(['message' => 'Token expirado.'], 401);
+        }
+
+        $user = $token->tokenable;
+
+        return new UserResource($user);
     }
 }

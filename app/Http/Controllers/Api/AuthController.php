@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use App\models\RefreshToken;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class AuthController extends Controller
 {
@@ -24,7 +25,16 @@ class AuthController extends Controller
         $validated['password'] = Hash::make($validated['password']);
         $user = User::create($validated);
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+        // Access token
+        $plainTextToken = $user->createToken('auth_token')->plainTextToken;
+
+        // Separa el ID del token y el valor
+        [$tokenId, $tokenString] = explode('|', $plainTextToken, 2);
+
+        // Busca el registro en la base de datos y asigna la expiración
+        $personalToken = \Laravel\Sanctum\PersonalAccessToken::find($tokenId);
+        $personalToken->expires_date = now()->addMinutes(40);
+        $personalToken->save();
 
         return response()->json([
             'user' => $user,
