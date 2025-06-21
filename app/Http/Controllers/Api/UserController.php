@@ -83,7 +83,7 @@ class UserController extends Controller
         if (!hash_equals($token->token, hash('sha256', $tokenString))) {
             return response()->json(['message' => 'Token inválido.'], 401);
         }
-        if (isset($token->expires_date) && $token->expires_date < now()) {
+        if (isset($token->expires_at) && $token->expires_at < now()) {
             return response()->json(['message' => 'Token expirado.'], 401);
         }
 

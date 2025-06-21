@@ -33,13 +33,37 @@ class AuthController extends Controller
 
         // Busca el registro en la base de datos y asigna la expiración
         $personalToken = \Laravel\Sanctum\PersonalAccessToken::find($tokenId);
-        $personalToken->expires_date = now()->addMinutes(40);
+        $personalToken->expires_at = now()->addMinutes(240);
         $personalToken->save();
 
+        // Refresh token
+        $refreshToken = bin2hex(random_bytes(40));
+        $expireDate = now()->addDays(7);
+
+        // Guarda el refresh token en la base de datos
+        RefreshToken::create([
+            'user_id' => $user->id,
+            'refresh_token' => hash('sha256', $refreshToken),
+            'expire_date' => $expireDate,
+            'api_address' => $request->ip(),
+        ]);
+
+        // Devuelve access_token en JSON y refresh_token como cookie HttpOnly
         return response()->json([
             'user' => $user,
-            'token' => $token,
-        ], 201);
+            'token' => $plainTextToken,
+            'expires_at' => $personalToken->expires_at,
+        ], 201)->cookie(
+            'refresh_token',
+            $refreshToken,
+            60 * 24 * 7, // 7 días en minutos
+            null,
+            null,
+            false, // Secure (para localhost)
+            true,  // HttpOnly
+            false,
+            'Strict'
+        );
     }
 
     // Login de usuario
@@ -61,6 +85,14 @@ class AuthController extends Controller
         // Access token
         $accessToken = $user->createToken('auth_token')->plainTextToken;
 
+        // Separa el ID del token y el valor
+        [$tokenId, $tokenString] = explode('|', $accessToken, 2);
+
+        // Busca el registro en la base de datos y asigna la expiración
+        $personalToken = \Laravel\Sanctum\PersonalAccessToken::find($tokenId);
+        $personalToken->expires_at = now()->addMinutes(240); // 4 horas
+        $personalToken->save();
+
         // Refresh token (puedes usar Str::random o similar y guardarlo en la DB)
         $refreshToken = bin2hex(random_bytes(40));
         $expireDate = now()->addDays(7);
@@ -76,7 +108,7 @@ class AuthController extends Controller
         // Devuelve access_token en JSON y refresh_token como cookie HttpOnly
         return response()->json([
             'user' => $user,
-            'access_token' => $accessToken,
+            'token' => $accessToken,
         ])->cookie(
             'refresh_token',
             $refreshToken,
