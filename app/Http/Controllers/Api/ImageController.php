@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use App\Models\Image;
 
 class ImageController extends Controller
 {
@@ -40,10 +41,20 @@ class ImageController extends Controller
         
         // Guardar archivo
         $filePath = $file->storeAs($folder, $fileName, 'public');
+        $url = '/storage/' . $filePath;
+
+        // Guardar en base de datos
+        $image = Image::create([
+            'filename' => $fileName,
+            'url' => $url,
+            'type' => $type,
+            // No asignamos imageable porque es solo upload independiente
+        ]);
 
         return response()->json([
             'message' => 'Imagen subida exitosamente',
-            'url' => '/storage/' . $filePath,
+            'image_id' => $image->id,
+            'url' => $url,
             'filename' => $fileName,
             'type' => $type
         ], 201);
