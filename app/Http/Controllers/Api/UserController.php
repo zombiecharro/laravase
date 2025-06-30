@@ -89,6 +89,9 @@ class UserController extends Controller
 
         $user = $token->tokenable;
 
+        // Cargar relaciones de profile y addresses
+        $user->load(['profile', 'addresses']);
+
         return new UserResource($user);
     }
 }
