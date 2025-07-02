@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 use App\Http\Resources\UserResource;
 use Laravel\Sanctum\PersonalAccessToken;
 
@@ -26,11 +27,64 @@ class UserController extends Controller
             'email' => 'required|email|unique:users',
             'password' => 'required|string|min:6',
             'role' => 'required|in:admin,staff,user',
+            
+            // Campos del perfil (opcionales)
+            'first_name' => 'nullable|string|max:255',
+            'last_name' => 'nullable|string|max:255',
+            'phone' => 'nullable|string|max:20',
+            'bio' => 'nullable|string|max:1000',
+            'birth_date' => 'nullable|date',
+            
+            // Campos de dirección (opcionales)
+            'street' => 'nullable|string|max:255',
+            'street_number' => 'nullable|string|max:20',
+            'apartment' => 'nullable|string|max:50',
+            'city' => 'nullable|string|max:100',
+            'state' => 'nullable|string|max:100',
+            'postal_code' => 'nullable|string|max:10',
+            'country' => 'nullable|string|max:100',
+            'additional_info' => 'nullable|string|max:500',
         ]);
 
-        $validated['password'] = Hash::make($validated['password']);
+        $user = DB::transaction(function () use ($validated) {
+            // Crear el usuario
+            $user = User::create([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'password' => Hash::make($validated['password']),
+                'role' => $validated['role'],
+            ]);
 
-        $user = User::create($validated);
+            // Crear perfil (siempre se crea, aunque esté vacío)
+            $user->profile()->create([
+                'first_name' => $validated['first_name'] ?? null,
+                'last_name' => $validated['last_name'] ?? null,
+                'phone' => $validated['phone'] ?? null,
+                'bio' => $validated['bio'] ?? null,
+                'birth_date' => $validated['birth_date'] ?? null,
+                'preferences' => [], // JSON vacío por defecto
+            ]);
+
+            // Crear dirección por defecto (solo si se proporcionan datos básicos)
+            if (!empty($validated['street']) || !empty($validated['city'])) {
+                $user->addresses()->create([
+                    'street' => $validated['street'] ?? '',
+                    'street_number' => $validated['street_number'] ?? null,
+                    'apartment' => $validated['apartment'] ?? null,
+                    'city' => $validated['city'] ?? '',
+                    'state' => $validated['state'] ?? '',
+                    'postal_code' => $validated['postal_code'] ?? '',
+                    'country' => $validated['country'] ?? 'México',
+                    'additional_info' => $validated['additional_info'] ?? null,
+                    'is_default' => true, // Primera dirección es por defecto
+                ]);
+            }
+
+            // Cargar las relaciones para el retorno
+            $user->load(['profile', 'addresses']);
+            
+            return $user;
+        });
 
         return new UserResource($user);
     }
@@ -57,6 +111,9 @@ class UserController extends Controller
         }
 
         $user->update($validated);
+
+        // Cargar relaciones para el retorno
+        $user->load(['profile', 'addresses']);
 
         return new UserResource($user);
     }

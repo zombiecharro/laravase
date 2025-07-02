@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use App\models\RefreshToken;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -20,42 +21,101 @@ class AuthController extends Controller
             'email' => 'required|email|unique:users',
             'password' => 'required|string|min:6',
             'role' => 'required|in:admin,staff,user',
+            
+            // Campos del perfil (opcionales)
+            'first_name' => 'nullable|string|max:255',
+            'last_name' => 'nullable|string|max:255',
+            'phone' => 'nullable|string|max:20',
+            'bio' => 'nullable|string|max:1000',
+            'birth_date' => 'nullable|date',
+            
+            // Campos de dirección (opcionales)
+            'street' => 'nullable|string|max:255',
+            'street_number' => 'nullable|string|max:20',
+            'apartment' => 'nullable|string|max:50',
+            'city' => 'nullable|string|max:100',
+            'state' => 'nullable|string|max:100',
+            'postal_code' => 'nullable|string|max:10',
+            'country' => 'nullable|string|max:100',
+            'additional_info' => 'nullable|string|max:500',
         ]);
 
-        $validated['password'] = Hash::make($validated['password']);
-        $user = User::create($validated);
+        $user = DB::transaction(function () use ($validated, $request) {
+            // Crear el usuario
+            $user = User::create([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'password' => Hash::make($validated['password']),
+                'role' => $validated['role'],
+            ]);
 
-        // Access token
-        $plainTextToken = $user->createToken('auth_token')->plainTextToken;
+            // Crear perfil (siempre se crea, aunque esté vacío)
+            $user->profile()->create([
+                'first_name' => $validated['first_name'] ?? null,
+                'last_name' => $validated['last_name'] ?? null,
+                'phone' => $validated['phone'] ?? null,
+                'bio' => $validated['bio'] ?? null,
+                'birth_date' => $validated['birth_date'] ?? null,
+                'preferences' => [], // JSON vacío por defecto
+            ]);
 
-        // Separa el ID del token y el valor
-        [$tokenId, $tokenString] = explode('|', $plainTextToken, 2);
+            // Crear dirección por defecto (solo si se proporcionan datos básicos)
+            if (!empty($validated['street']) || !empty($validated['city'])) {
+                $user->addresses()->create([
+                    'street' => $validated['street'] ?? '',
+                    'street_number' => $validated['street_number'] ?? null,
+                    'apartment' => $validated['apartment'] ?? null,
+                    'city' => $validated['city'] ?? '',
+                    'state' => $validated['state'] ?? '',
+                    'postal_code' => $validated['postal_code'] ?? '',
+                    'country' => $validated['country'] ?? 'México',
+                    'additional_info' => $validated['additional_info'] ?? null,
+                    'is_default' => true, // Primera dirección es por defecto
+                ]);
+            }
 
-        // Busca el registro en la base de datos y asigna la expiración
-        $personalToken = \Laravel\Sanctum\PersonalAccessToken::find($tokenId);
-        $personalToken->expires_at = now()->addMinutes(240);
-        $personalToken->save();
+            // Access token
+            $plainTextToken = $user->createToken('auth_token')->plainTextToken;
 
-        // Refresh token
-        $refreshToken = bin2hex(random_bytes(40));
-        $expireDate = now()->addDays(7);
+            // Separa el ID del token y el valor
+            [$tokenId, $tokenString] = explode('|', $plainTextToken, 2);
 
-        // Guarda el refresh token en la base de datos
-        RefreshToken::create([
-            'user_id' => $user->id,
-            'refresh_token' => hash('sha256', $refreshToken),
-            'expire_date' => $expireDate,
-            'api_address' => $request->ip(),
-        ]);
+            // Busca el registro en la base de datos y asigna la expiración
+            $personalToken = \Laravel\Sanctum\PersonalAccessToken::find($tokenId);
+            $personalToken->expires_at = now()->addMinutes(240);
+            $personalToken->save();
+
+            // Refresh token
+            $refreshToken = bin2hex(random_bytes(40));
+            $expireDate = now()->addDays(7);
+
+            // Guarda el refresh token en la base de datos
+            RefreshToken::create([
+                'user_id' => $user->id,
+                'refresh_token' => hash('sha256', $refreshToken),
+                'expire_date' => $expireDate,
+                'api_address' => $request->ip(),
+            ]);
+
+            // Cargar las relaciones para el retorno
+            $user->load(['profile', 'addresses']);
+
+            return [
+                'user' => $user,
+                'plainTextToken' => $plainTextToken,
+                'refreshToken' => $refreshToken,
+                'personalToken' => $personalToken
+            ];
+        });
 
         // Devuelve access_token en JSON y refresh_token como cookie HttpOnly
         return response()->json([
-            'user' => $user,
-            'token' => $plainTextToken,
-            'expires_at' => $personalToken->expires_at,
+            'user' => $user['user'],
+            'token' => $user['plainTextToken'],
+            'expires_at' => $user['personalToken']->expires_at,
         ], 201)->cookie(
             'refresh_token',
-            $refreshToken,
+            $user['refreshToken'],
             60 * 24 * 7, // 7 días en minutos
             null,
             null,
@@ -104,6 +164,9 @@ class AuthController extends Controller
             'expire_date' => $expireDate,
             'api_address' => $request->ip(),
         ]);
+
+        // Cargar relaciones para el retorno
+        $user->load(['profile', 'addresses']);
 
         // Devuelve access_token en JSON y refresh_token como cookie HttpOnly
         return response()->json([
