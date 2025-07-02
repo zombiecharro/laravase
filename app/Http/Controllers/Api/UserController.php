@@ -14,7 +14,8 @@ class UserController extends Controller
     // Listar todos los usuarios
     public function index()
     {
-        return UserResource::collection(User::all());
+        $users = User::with(['profile', 'addresses'])->get();
+        return UserResource::collection($users);
     }
 
     // Crear un nuevo usuario
@@ -37,6 +38,7 @@ class UserController extends Controller
     // Mostrar un usuario específico
     public function show(User $user)
     {
+        $user->load(['profile', 'addresses']);
         return new UserResource($user);
     }
 
