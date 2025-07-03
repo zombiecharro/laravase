@@ -15,6 +15,11 @@ class Image extends Model
         'imageable_type',
     ];
 
+    protected $attributes = [
+        'imageable_id' => null,
+        'imageable_type' => null,
+    ];
+
     /**
      * Relación polimórfica: Una imagen puede pertenecer a cualquier modelo
      */

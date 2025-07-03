@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('filename'); // Nombre del archivo
             $table->string('url'); // URL completa de acceso
             $table->string('type'); // avatar, product, gallery, etc.
-            $table->morphs('imageable'); // Para polimorfismo (imageable_id, imageable_type)
+            $table->nullableMorphs('imageable'); // Para polimorfismo (imageable_id, imageable_type) - nullable
             $table->timestamps();
         });
     }

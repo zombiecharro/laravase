@@ -16,6 +16,8 @@ class ImageController extends Controller
         $validator = Validator::make($request->all(), [
             'image' => 'required|file|image|mimes:jpeg,png,jpg,gif|max:2048',
             'type' => 'required|in:avatar,product,gallery',
+            'imageable_type' => 'nullable|string',
+            'imageable_id' => 'nullable|integer|min:1',
         ]);
 
         if ($validator->fails()) {
@@ -27,7 +29,9 @@ class ImageController extends Controller
 
         $file = $request->file('image');
         $type = $request->input('type');
-        
+        $iType = $request->input('imageable_type', null);
+        $iId = $request->input('imageable_id', null);
+
         // Organizar por tipo de imagen
         $folder = match($type) {
             'avatar' => 'avatars',
@@ -44,12 +48,19 @@ class ImageController extends Controller
         $url = '/storage/' . $filePath;
 
         // Guardar en base de datos
-        $image = Image::create([
+        $imageData = [
             'filename' => $fileName,
             'url' => $url,
             'type' => $type,
-            // No asignamos imageable porque es solo upload independiente
-        ]);
+        ];
+
+        // Solo agregar campos imageable si están presentes
+        if ($iId !== null && $iType !== null) {
+            $imageData['imageable_id'] = $iId;
+            $imageData['imageable_type'] = $iType;
+        }
+
+        $image = Image::create($imageData);
 
         return response()->json([
             'message' => 'Imagen subida exitosamente',
