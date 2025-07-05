@@ -16,8 +16,8 @@ class ImageController extends Controller
         $validator = Validator::make($request->all(), [
             'image' => 'required|file|image|mimes:jpeg,png,jpg,gif|max:2048',
             'type' => 'required|in:avatar,product,gallery',
-            'imageable_type' => 'nullable|string',
-            'imageable_id' => 'nullable|integer|min:1',
+            'imageable_type' => 'nullable|string|required_with:imageable_id',
+            'imageable_id' => 'nullable|integer|min:1|required_with:imageable_type',
         ]);
 
         if ($validator->fails()) {
@@ -67,7 +67,9 @@ class ImageController extends Controller
             'image_id' => $image->id,
             'url' => $url,
             'filename' => $fileName,
-            'type' => $type
+            'type' => $type,
+            'imaginable_type' => $iType,
+            'imaginable_id' => $iId
         ], 201);
     }
 }

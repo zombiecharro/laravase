@@ -11,13 +11,13 @@ class Image extends Model
         'filename',
         'url',
         'type',
-        'imageable_id',
-        'imageable_type',
+        'imaginable_id',
+        'imaginable_type',
     ];
 
     protected $attributes = [
-        'imageable_id' => null,
-        'imageable_type' => null,
+        'imaginable_id' => null,
+        'imaginable_type' => null,
     ];
 
     /**
