@@ -26,11 +26,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Upload de imágenes
     Route::post('upload-image', [ImageController::class, 'upload']);
     
-    // Profile - Solo store y update
-    Route::post('profile', [UserProfileController::class, 'store']);
-    Route::put('profile', [UserProfileController::class, 'update']); // Sin {id}
+    // Profile - Solo actualización parcial
+    Route::patch('profile', [UserProfileController::class, 'update']); // Sin {id}
     
-    // Address - Solo store y update  
-    Route::post('address', [AddressController::class, 'store']);
-    Route::put('address', [AddressController::class, 'update']); // Sin {id}
+    // Address - Solo actualización parcial  
+    Route::patch('address', [AddressController::class, 'update']); // Sin {id}
 });
