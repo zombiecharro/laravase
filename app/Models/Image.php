@@ -23,7 +23,7 @@ class Image extends Model
     /**
      * Relación polimórfica: Una imagen puede pertenecer a cualquier modelo
      */
-    public function imageable(): MorphTo
+    public function imaginable(): MorphTo
     {
         return $this->morphTo();
     }
