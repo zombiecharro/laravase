@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Models\Category;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -14,6 +15,13 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        // Crear categoría general
+        Category::create([
+            'name' => 'General',
+            'slug' => 'general',
+            'description' => 'Categoría general para productos diversos',
+        ]);
+
         // Crear usuario administrador principal
         $admin = User::create([
             'name' => 'Arturo Castillo',

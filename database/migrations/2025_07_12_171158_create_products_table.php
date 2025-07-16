@@ -14,12 +14,12 @@ return new class extends Migration
         Schema::create('products', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('sku')->unique(); // Slug para URL amigable
+            $table->string('sku')->unique()->nullable(); // Nullable pero único cuando tenga valor
             $table->text('description')->nullable();
             $table->text('instructions')->nullable();
             $table->decimal('price', 10, 2)->default(0.00); // Precio del producto
             $table->integer('stock')->default(0);
-            $table->foreignId('category_id')->constrained()->onDelete('cascade')->default(1); // Asumiendo que hay una categoría por defecto
+            $table->unsignedBigInteger('category_id')->default(1);
             $table->string('image_url')->default('storage/images/noImg.jpg'); // URL de la imagen del producto
             $table->timestamps();
         });

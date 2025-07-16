@@ -20,7 +20,6 @@ class Product extends Model
         'category_id',
         'image_url',
     ];
-
     /**
      * Getter para la imagen principal
      */
@@ -28,7 +27,6 @@ class Product extends Model
     {
         return $this->image_url ?: 'storage/images/noImg.jpg';
     }
-
     /**
      * Relación polimórfica para imágenes adicionales (galería)
      */
@@ -36,7 +34,6 @@ class Product extends Model
     {
         return $this->morphMany(Image::class, 'imaginable');
     }
-
     /**
      * Relación con categoría
      */
