@@ -82,7 +82,7 @@ class AuthController extends Controller
 
             // Busca el registro en la base de datos y asigna la expiración
             $personalToken = \Laravel\Sanctum\PersonalAccessToken::find($tokenId);
-            $personalToken->expires_at = now()->addMinutes(240);
+            $personalToken->expires_at = now()->addMinutes(240); // 4 horas
             $personalToken->save();
 
             // Refresh token
@@ -219,6 +219,34 @@ class AuthController extends Controller
 
         return response()->json([
             'access_token' => $accessToken,
+        ]);
+    }
+
+    // Verificar token y obtener usuario autenticado
+    public function verify(Request $request)
+    {
+        $user = $request->user();
+        
+        if (!$user) {
+            return response()->json([
+                'message' => 'Token inválido o expirado.'
+            ], 401);
+        }
+
+        // Verificar si el token actual no ha expirado
+        $currentToken = $user->currentAccessToken();
+        if ($currentToken && $currentToken->expires_at && $currentToken->expires_at->isPast()) {
+            return response()->json([
+                'message' => 'Token expirado.'
+            ], 401);
+        }
+
+        // Cargar relaciones para el retorno
+        $user->load(['profile', 'addresses']);
+
+        return response()->json([
+            'user' => $user,
+            'token_expires_at' => $currentToken ? $currentToken->expires_at : null,
         ]);
     }
 

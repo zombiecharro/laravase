@@ -13,8 +13,8 @@ use App\Http\middleware\RoleChk;
 Route::post('auth/signup', [AuthController::class, 'signup']);
 Route::post('auth/login', [AuthController::class, 'login']);
 Route::post('auth/refresh', [AuthController::class, 'refresh']);
-// Ruta para verificar el Bearer token y obtener el usuario autenticado
-Route::middleware(['auth:sanctum'])->get('user', [UserController::class, 'verify']);
+Route::get('auth/me', [AuthController::class, 'verify'])->middleware('auth:sanctum');
+
 // Rutas API para User usando apiResource
 Route::apiResource('users', UserController::class)
     ->middleware(['auth:sanctum', RoleChk::class . ':admin,staff']);
