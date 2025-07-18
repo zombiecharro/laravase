@@ -217,8 +217,21 @@ class AuthController extends Controller
         // Crea un nuevo access token
         $accessToken = $user->createToken('auth_token')->plainTextToken;
 
+        // Separa el ID del token y el valor para configurar expiración
+        [$tokenId, $tokenString] = explode('|', $accessToken, 2);
+
+        // Busca el registro en la base de datos y asigna la expiración
+        $personalToken = \Laravel\Sanctum\PersonalAccessToken::find($tokenId);
+        $personalToken->expires_at = now()->addMinutes(240); // 4 horas
+        $personalToken->save();
+
+        // Cargar relaciones para el retorno
+        $user->load(['profile', 'addresses']);
+
         return response()->json([
-            'access_token' => $accessToken,
+            'user' => $user,
+            'token' => $accessToken,
+            'token_expires_at' => $personalToken->expires_at,
         ]);
     }
 
