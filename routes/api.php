@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\UserProfileController;
 use App\Http\Controllers\Api\AddressController;
 use App\Http\Controllers\Api\ImageController;
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\OrderController;
 use App\Http\middleware\RoleChk;
 
 // Rutas de autenticación
@@ -29,6 +30,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('products/{product}', [ProductController::class, 'update'])
         ->middleware(RoleChk::class . ':admin,staff');
     Route::delete('products/{product}', [ProductController::class, 'destroy'])
+        ->middleware(RoleChk::class . ':admin,staff');    
+});
+// Rutas API para órdenes
+Route::middleware('auth:sanctum')->group(function () {
+    // Órdenes - Todos los usuarios autenticados (lógica interna diferencia admin/user)
+    Route::get('orders', [OrderController::class, 'index']);
+    Route::post('orders', [OrderController::class, 'store']);
+    Route::get('orders/{order}', [OrderController::class, 'show']);
+    Route::patch('orders/{order}', [OrderController::class, 'update']);
+    Route::put('orders/{order}/items', [OrderController::class, 'updateItems']);
+    // Órdenes - Solo admin/staff pueden eliminar
+    Route::delete('orders/{order}', [OrderController::class, 'destroy'])
         ->middleware(RoleChk::class . ':admin,staff');
 });
 // Rutas API para UserProfile y Address usando apiResource anidado
