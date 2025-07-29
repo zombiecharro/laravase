@@ -14,6 +14,14 @@ class Category extends Model
     ];
 
     /**
+     * Scope: Buscar por slug exacto
+     */
+    public function scopeBySlug($query, $slug)
+    {
+        return $query->where('slug', $slug);
+    }
+
+    /**
      * Relación: Una categoría tiene muchos productos
      */
     public function products(): HasMany

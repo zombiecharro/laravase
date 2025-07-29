@@ -15,12 +15,33 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // Crear categoría general
-        Category::create([
-            'name' => 'General',
-            'slug' => 'general',
-            'description' => 'Categoría general para productos diversos',
-        ]);
+        // Crear categorías principales del negocio
+        $categories = [
+            [
+                'name' => 'General',
+                'slug' => 'general',
+                'description' => 'Productos para limpias',
+            ],
+            [
+                'name' => 'Limpias',
+                'slug' => 'limpias',
+                'description' => 'Productos para limpias',
+            ],
+            [
+                'name' => 'Amor',
+                'slug' => 'amor',
+                'description' => 'Productos para atraer amor y relaciones',
+            ],
+            [
+                'name' => 'Protección',
+                'slug' => 'proteccion',
+                'description' => 'Productos para protección y guardia espiritual',
+            ],
+        ];
+
+        foreach ($categories as $categoryData) {
+            Category::create($categoryData);
+        }
 
         // Crear usuario administrador principal
         $admin = User::create([

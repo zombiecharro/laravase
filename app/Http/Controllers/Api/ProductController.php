@@ -13,11 +13,18 @@ class ProductController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $products = Product::select('id', 'name', 'sku', 'price', 'stock', 'image_url', 'created_at')
-            ->orderBy('created_at', 'desc')
-            ->get();
+        $query = Product::select('id', 'name', 'sku', 'price', 'stock', 'image_url', 'created_at');
+        
+        // Filtrar por categoría si se proporciona el parámetro 'cat'
+        if ($request->has('cat')) {
+            $categoryId = $request->get('cat');
+            
+            $query->where('category_id', $categoryId);
+        }
+        
+        $products = $query->orderBy('created_at', 'desc')->get();
 
         return response()->json([
             'message' => 'Productos obtenidos exitosamente',
