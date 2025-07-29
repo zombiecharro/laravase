@@ -11,7 +11,10 @@ use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
-    // index - obtener órdenes (admin ve todas, usuario ve solo las suyas)
+    ///////////////////////////////////////
+    // index - obtener órdenes (admin ve todas,
+    //  usuario ve solo las suyas)
+    ///////////////////////////////////////
     public function index(Request $request)
     {
         $user = auth()->user();
@@ -44,8 +47,9 @@ class OrderController extends Controller
             'orders' => $orders
         ]);
     }
-
+    ///////////////////////////////////////
     // store crear nueva orden con items
+    ///////////////////////////////////////
     public function store(Request $request)
     {
         // Validar los datos de la orden y los items
@@ -70,6 +74,12 @@ class OrderController extends Controller
             foreach ($validatedData['items'] as $item) {
                 // Obtener el producto para el precio actual
                 $product = Product::findOrFail($item['product_id']);
+                
+                // Verificar stock disponible ANTES de crear la orden
+                if ($product->stock < $item['quantity']) {
+                    throw new \Exception("Stock insuficiente para el producto: {$product->name}. Stock disponible: {$product->stock}, solicitado: {$item['quantity']}");
+                }
+                
                 $itemTotal = $product->price * $item['quantity'];
                 $total += $itemTotal;
 
@@ -87,9 +97,13 @@ class OrderController extends Controller
                 'status' => $validatedData['status'] ?? 'pending',
             ]);
 
-            // Crear los items de la orden
+            // Crear los items de la orden y actualizar stock
             foreach ($orderItemsData as $itemData) {
                 $order->items()->create($itemData);
+                
+                // Reducir stock del producto
+                $product = Product::findOrFail($itemData['product_id']);
+                $product->decrement('stock', $itemData['quantity']);
             }
 
             DB::commit();
@@ -110,6 +124,10 @@ class OrderController extends Controller
             ], 500);
         }
     }
+
+    ///////////////////////////////////////
+    // show - obtener detalles de una orden
+    ///////////////////////////////////////
     public function show(Order $order)
     {
         // Cargar los items y productos relacionados
@@ -120,23 +138,40 @@ class OrderController extends Controller
             'order' => $order
         ]);
     }
+
+    ///////////////////////////////////////
+    // destroy - eliminar una orden y restaurar stock
+    ///////////////////////////////////////
     public function destroy(Order $order)
     {
         try {
+            DB::beginTransaction();
+            
+            // Restaurar stock antes de eliminar la orden
+            foreach ($order->items as $item) {
+                $product = Product::findOrFail($item->product_id);
+                $product->increment('stock', $item->quantity);
+            }
+            
             // Eliminar la orden y sus items
             $order->delete();
+            
+            DB::commit();
 
             return response()->json([
-                'message' => 'Orden eliminada exitosamente'
+                'message' => 'Orden eliminada exitosamente y stock restaurado'
             ]);
         } catch (\Exception $e) {
+            DB::rollBack();
             return response()->json([
                 'message' => 'Error al eliminar la orden',
                 'error' => $e->getMessage()
             ], 500);
         }
     }
-
+    ///////////////////////////////////////
+    // update - actualizar estado de una orden
+    ///////////////////////////////////////
     public function update(Request $request, Order $order)
     {
         // Validar los datos de la orden
@@ -144,19 +179,56 @@ class OrderController extends Controller
             'status' => 'string|in:pending,completed,cancelled',
         ]);
 
-        // Actualizar el estado de la orden
-        if (isset($validatedData['status'])) {
-            $order->status = $validatedData['status'];
-            $order->save();
+        try {
+            DB::beginTransaction();
+            
+            // Actualizar el estado de la orden
+            if (isset($validatedData['status'])) {
+                $oldStatus = $order->status;
+                $newStatus = $validatedData['status'];
+                
+                // Si la orden se cancela, restaurar stock
+                if ($oldStatus !== 'cancelled' && $newStatus === 'cancelled') {
+                    foreach ($order->items as $item) {
+                        $product = Product::findOrFail($item->product_id);
+                        $product->increment('stock', $item->quantity);
+                    }
+                }
+                
+                // Si la orden se reactiva desde cancelada, reducir stock nuevamente
+                if ($oldStatus === 'cancelled' && $newStatus !== 'cancelled') {
+                    foreach ($order->items as $item) {
+                        $product = Product::findOrFail($item->product_id);
+                        if ($product->stock < $item->quantity) {
+                            throw new \Exception("Stock insuficiente para reactivar la orden. Producto: {$product->name}");
+                        }
+                        $product->decrement('stock', $item->quantity);
+                    }
+                }
+                
+                $order->status = $newStatus;
+                $order->save();
+            }
+            
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Orden actualizada exitosamente',
+                'order' => $order->fresh()
+            ]);
+            
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Error al actualizar la orden',
+                'error' => $e->getMessage()
+            ], 500);
         }
-
-        return response()->json([
-            'message' => 'Orden actualizada exitosamente',
-            'order' => $order->fresh()
-        ]);
     }
-
+    
+    //////////////////////////////////////////////////////////////////////////
     // updateItems - actualizar items de una orden (reemplaza todos los items)
+    //////////////////////////////////////////////////////////////////////////
     public function updateItems(Request $request, Order $order)
     {
         // 1. Validar que la orden se pueda modificar
@@ -184,15 +256,21 @@ class OrderController extends Controller
         try {
             DB::beginTransaction();
             
-            // 4. Eliminar todos los items existentes
+            // 4. Restaurar stock de los items existentes antes de eliminarlos
+            foreach ($order->items as $existingItem) {
+                $product = Product::findOrFail($existingItem->product_id);
+                $product->increment('stock', $existingItem->quantity);
+            }
+            
+            // 5. Eliminar todos los items existentes
             $order->items()->delete();
             
-            // 5. Crear los nuevos items y calcular total
+            // 6. Crear los nuevos items y calcular total
             $total = 0;
             foreach ($validatedData['items'] as $item) {
                 $product = Product::findOrFail($item['product_id']);
                 
-                // Verificar stock disponible
+                // Verificar stock disponible (ya restaurado)
                 if ($product->stock < $item['quantity']) {
                     throw new \Exception("Stock insuficiente para el producto: {$product->name}. Stock disponible: {$product->stock}");
                 }
@@ -205,6 +283,9 @@ class OrderController extends Controller
                     'quantity' => $item['quantity'],
                     'price' => $product->price, // Usar precio actual del producto
                 ]);
+                
+                // Reducir stock del producto
+                $product->decrement('stock', $item['quantity']);
             }
             
             // 6. Actualizar el total de la orden
