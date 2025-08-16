@@ -18,10 +18,12 @@ class Address extends Model
         'country',
         'additional_info',
         'is_default',
+        'is_temporary',
     ];
 
     protected $casts = [
         'is_default' => 'boolean',
+        'is_temporary' => 'boolean',
     ];
 
     /**
@@ -33,11 +35,35 @@ class Address extends Model
     }
 
     /**
+     * Relación: Una dirección puede tener muchas órdenes
+     */
+    public function orders()
+    {
+        return $this->hasMany(Order::class);
+    }
+
+    /**
      * Scope para obtener la dirección por defecto
      */
     public function scopeDefault($query)
     {
         return $query->where('is_default', true);
+    }
+
+    /**
+     * Scope para obtener direcciones temporales
+     */
+    public function scopeTemporary($query)
+    {
+        return $query->where('is_temporary', true);
+    }
+
+    /**
+     * Scope para obtener direcciones permanentes (de usuario)
+     */
+    public function scopePermanent($query)
+    {
+        return $query->where('is_temporary', false);
     }
 
     /**

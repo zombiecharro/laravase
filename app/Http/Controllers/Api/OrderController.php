@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Address;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
@@ -20,7 +21,7 @@ class OrderController extends Controller
         $user = auth()->user();
         
         // Construir la consulta base
-        $query = Order::with(['user:id,name,email', 'items.product:id,name,price']);
+        $query = Order::with(['user:id,name,email', 'items.product:id,name,price', 'address']);
         
         // Si no es admin/staff, solo mostrar sus órdenes
         if (!in_array($user->role, ['admin', 'staff'])) {
@@ -48,24 +49,104 @@ class OrderController extends Controller
         ]);
     }
     ///////////////////////////////////////
-    // store crear nueva orden con items
+    // store crear nueva orden con items y dirección
     ///////////////////////////////////////
     public function store(Request $request)
     {
-        // Validar los datos de la orden y los items
+        // Validar los datos de la orden, items y dirección
         $validatedData = $request->validate([
-            'user_id' => 'required|exists:users,id',
+            // Validación para la orden
             'status' => 'string|in:pending,completed,cancelled',
             
             // Validación para los items de la orden
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
+            
+            // Validación para dirección (Flujo A: usar existente)
+            'address_id' => 'nullable|exists:addresses,id',
+            
+            // Validación para nueva dirección (Flujo B y C)
+            'new_address' => 'nullable|array',
+            'new_address.street' => 'required_with:new_address|string|max:255',
+            'new_address.street_number' => 'nullable|string|max:50',
+            'new_address.apartment' => 'nullable|string|max:50',
+            'new_address.city' => 'required_with:new_address|string|max:100',
+            'new_address.state' => 'nullable|string|max:100',
+            'new_address.postal_code' => 'nullable|string|max:20',
+            'new_address.country' => 'nullable|string|max:100',
+            'new_address.additional_info' => 'nullable|string|max:500',
+            'new_address.is_temporary' => 'nullable|boolean',
+            'new_address.is_default' => 'nullable|boolean',
         ]);
+
+        // Validar que se proporcione address_id O new_address, pero no ambos
+        if (!$request->has('address_id') && !$request->has('new_address')) {
+            return response()->json([
+                'message' => 'Debe proporcionar address_id o new_address',
+                'errors' => ['address' => ['Se requiere una dirección para la orden']]
+            ], 422);
+        }
+
+        if ($request->has('address_id') && $request->has('new_address')) {
+            return response()->json([
+                'message' => 'Solo puede proporcionar address_id O new_address, no ambos',
+                'errors' => ['address' => ['Conflicto en la especificación de dirección']]
+            ], 422);
+        }
 
         try {
             // Usar transacción para asegurar consistencia
             DB::beginTransaction();
+
+            $user = auth()->user();
+            $addressId = null;
+
+            // FLUJO A: Usar dirección existente
+            if ($request->has('address_id')) {
+                $address = Address::findOrFail($validatedData['address_id']);
+                
+                // Verificar que la dirección pertenezca al usuario (si no es temporal)
+                if (!$address->is_temporary && $address->user_id !== $user->id) {
+                    throw new \Exception('No tienes permisos para usar esta dirección');
+                }
+                
+                $addressId = $address->id;
+            }
+            
+            // FLUJO B y C: Crear nueva dirección
+            elseif ($request->has('new_address')) {
+                $addressData = $validatedData['new_address'];
+                
+                if ($addressData['is_temporary'] ?? false) {
+                    // FLUJO C: Dirección temporal
+                    $addressData['user_id'] = null;
+                    $addressData['is_default'] = false;
+                    $addressData['is_temporary'] = true;
+                } else {
+                    // FLUJO B: Dirección permanente del usuario
+                    $addressData['user_id'] = $user->id;
+                    $addressData['is_temporary'] = false;
+                    
+                    // Si es la primera dirección del usuario, hacerla por defecto
+                    if (!isset($addressData['is_default'])) {
+                        $userAddressCount = Address::where('user_id', $user->id)
+                                                  ->where('is_temporary', false)
+                                                  ->count();
+                        $addressData['is_default'] = ($userAddressCount === 0);
+                    }
+                    
+                    // Si se marca como por defecto, quitar el flag de otras direcciones
+                    if ($addressData['is_default'] ?? false) {
+                        Address::where('user_id', $user->id)
+                               ->where('is_temporary', false)
+                               ->update(['is_default' => false]);
+                    }
+                }
+                
+                $address = Address::create($addressData);
+                $addressId = $address->id;
+            }
 
             // Calcular el total basado en los items
             $total = 0;
@@ -92,7 +173,8 @@ class OrderController extends Controller
 
             // Crear la orden
             $order = Order::create([
-                'user_id' => $validatedData['user_id'],
+                'user_id' => $user->id,
+                'address_id' => $addressId,
                 'total' => $total,
                 'status' => $validatedData['status'] ?? 'pending',
             ]);
@@ -108,8 +190,8 @@ class OrderController extends Controller
 
             DB::commit();
 
-            // Cargar los items y productos relacionados para la respuesta
-            $order->load(['items.product', 'user']);
+            // Cargar los items, productos, usuario y dirección para la respuesta
+            $order->load(['items.product', 'user:id,name,email', 'address']);
 
             return response()->json([
                 'message' => 'Orden creada exitosamente',
@@ -130,8 +212,8 @@ class OrderController extends Controller
     ///////////////////////////////////////
     public function show(Order $order)
     {
-        // Cargar los items y productos relacionados
-        $order->load(['items.product', 'user']);
+        // Cargar los items, productos, usuario y dirección relacionados
+        $order->load(['items.product', 'user', 'address']);
 
         return response()->json([
             'message' => 'Orden obtenida exitosamente',

@@ -45,7 +45,7 @@ class ImageController extends Controller
         
         // Guardar archivo
         $filePath = $file->storeAs($folder, $fileName, 'public');
-        $url = '/storage/app/public/' . $filePath;
+        $url = asset('storage/' . $filePath);
 
         // Guardar en base de datos
         $imageData = [
