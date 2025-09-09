@@ -48,6 +48,34 @@ class OrderController extends Controller
             'orders' => $orders
         ]);
     }
+    
+    ///////////////////////////////////////
+    // myOrders - obtener órdenes del usuario logueado
+    ///////////////////////////////////////
+    public function myOrders(Request $request)
+    {
+        $user = auth()->user();
+        
+        // Construir la consulta base - solo órdenes del usuario logueado
+        $query = Order::with(['items.product:id,name,price', 'address'])
+                     ->where('user_id', $user->id);
+        
+        // Filtros opcionales
+        if ($request->has('status')) {
+            $query->where('status', $request->status);
+        }
+        
+        // Ordenar por más recientes primero
+        $query->orderBy('created_at', 'desc');
+        
+        // Paginar resultados
+        $orders = $query->paginate($request->get('per_page', 15));
+        
+        return response()->json([
+            'message' => 'Mis órdenes obtenidas exitosamente',
+            'orders' => $orders
+        ]);
+    }
     ///////////////////////////////////////
     // store crear nueva orden con items y dirección
     ///////////////////////////////////////

@@ -100,4 +100,9 @@ class User extends Authenticatable
         return $this->morphOne(Image::class, 'imageable')
                     ->where('type', 'avatar');
     }
+
+    public function shifts()
+    {
+        return $this->hasMany(Shift::class);
+    }
 }
