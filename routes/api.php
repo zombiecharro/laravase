@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\ImageController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ShiftController;
+use App\Http\Controllers\Api\AppointmentController;
 use App\Http\middleware\RoleChk;
 
 // Rutas de autenticación
@@ -31,35 +32,34 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('products/{product}', [ProductController::class, 'update'])
         ->middleware(RoleChk::class . ':admin,staff');
     Route::delete('products/{product}', [ProductController::class, 'destroy'])
-        ->middleware(RoleChk::class . ':admin,staff');    
-});
-
-// Rutas API para órdenes
-Route::middleware('auth:sanctum')->group(function () {
-    // Ruta específica para las órdenes del usuario logueado (DEBE IR ANTES que orders/{order})
-    Route::get('my-orders', [OrderController::class, 'myOrders']);
-    
-    // Órdenes - Todos los usuarios autenticados (lógica interna diferencia admin/user)
-    Route::get('orders', [OrderController::class, 'index']);
-    Route::post('orders', [OrderController::class, 'store']);
-    Route::get('orders/{order}', [OrderController::class, 'show']);
-    Route::patch('orders/{order}', [OrderController::class, 'update']);
-    Route::put('orders/{order}/items', [OrderController::class, 'updateItems']);
-    
-    // Órdenes - Solo admin/staff pueden eliminar
-    Route::delete('orders/{order}', [OrderController::class, 'destroy'])
         ->middleware(RoleChk::class . ':admin,staff');
-});
-// Rutas API para UserProfile y Address usando apiResource anidado
-Route::middleware('auth:sanctum')->group(function () {
-    // Upload de imágenes
-    Route::post('upload-image', [ImageController::class, 'upload']);
-    // Profile - Solo actualización parcial
-    Route::patch('profile', [UserProfileController::class, 'update']); // Sin {id}
-    // Address - Solo actualización parcial  
-    Route::patch('address', [AddressController::class, 'update']); // Sin {id}
-});
-// Rutas API para shifts (CRUD) - Todos los usuarios autenticados
-Route::middleware('auth:sanctum')->group(function () {
-   Route::apiResource('shifts', ShiftController::class);
-});
+    });
+    
+    // Rutas API para órdenes
+    Route::middleware('auth:sanctum')->group(function () {
+        // Ruta específica para las órdenes del usuario logueado (DEBE IR ANTES que orders/{order})
+        Route::get('my-orders', [OrderController::class, 'myOrders']);
+        
+        // Órdenes - Todos los usuarios autenticados (lógica interna diferencia admin/user)
+        Route::get('orders', [OrderController::class, 'index']);
+        Route::post('orders', [OrderController::class, 'store']);
+        Route::get('orders/{order}', [OrderController::class, 'show']);
+        Route::patch('orders/{order}', [OrderController::class, 'update']);
+        Route::put('orders/{order}/items', [OrderController::class, 'updateItems']);
+        
+        // Órdenes - Solo admin/staff pueden eliminar
+        Route::delete('orders/{order}', [OrderController::class, 'destroy'])
+        ->middleware(RoleChk::class . ':admin,staff');
+    });
+    // Rutas API para UserProfile y Address usando apiResource anidado
+    Route::middleware('auth:sanctum')->group(function () {
+        // Upload de imágenes
+        Route::post('upload-image', [ImageController::class, 'upload']);
+        // Profile - Solo actualización parcial
+        Route::patch('profile', [UserProfileController::class, 'update']); // Sin {id}
+        // Address - Solo actualización parcial  
+        Route::patch('address', [AddressController::class, 'update']); // Sin {id}
+    });
+    // Rutas API para shifts (CRUD) - Todos los usuarios autenticados
+    Route::apiResource('shifts', ShiftController::class)->middleware(['auth:sanctum', RoleChk::class . ':admin']);
+    Route::apiResource('appointments', AppointmentController::class)->except(['destroy'])->middleware('auth:sanctum');
