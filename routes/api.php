@@ -61,5 +61,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('address', [AddressController::class, 'update']); // Sin {id}
     });
     // Rutas API para shifts (CRUD) - Todos los usuarios autenticados
+    Route::middleware('auth:sanctum')->get('shifts/available-slots', [ShiftController::class, 'getAvailableSlots']);
     Route::apiResource('shifts', ShiftController::class)->middleware(['auth:sanctum', RoleChk::class . ':admin']);
     Route::apiResource('appointments', AppointmentController::class)->except(['destroy'])->middleware('auth:sanctum');

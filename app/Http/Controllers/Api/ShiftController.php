@@ -5,10 +5,36 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Shift;
+use App\Models\Appointment;
+use App\Services\AvailabilityService;
 
 class ShiftController extends Controller
 {
-    // Listar todos los shifts del usuario autenticado
+    /**
+     * Devuelve los slots disponibles calculados por AvailabilityService.
+     */
+    public function getAvailableSlots(Request $request)
+    {
+        $service = new AvailabilityService();
+
+        // Obtener usuario (puedes ajustar según tu lógica de autenticación)
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['error' => 'Usuario no autenticado'], 401);
+        }
+
+        // Obtener todas las citas del usuario (puedes ajustar el filtro si es necesario)
+        $appointments = Appointment::where('client_id', $user->id)->get()->toArray();
+
+        // Obtener año y mes de la request (query params)
+        $year = $request->query('year');
+        $month = $request->query('month');
+
+        // Calcular los slots disponibles para ese mes
+        $slots = $service->getAvailableSlots($user->id, $appointments, $year, $month);
+
+        return response()->json(['slots' => $slots]);
+    }
     public function index(Request $request)
     {
         $user = $request->user();
